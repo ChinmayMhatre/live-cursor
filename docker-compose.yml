@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:alpine
+
+  backend:
+    build: ./backend
+    # Exposing the port is optional here because Nginx routes to it internally,
+    # but helpful if you want to hit it directly for debugging.
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    # Using restart policy ensures the backend comes back up if it crashes
+    restart: on-failure
+
+  client:
+    build: ./client
+    ports:
+      - "8080:80" # Maps localhost:8080 to Nginx port 80
+    depends_on:
+      - backend
