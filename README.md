@@ -20,30 +20,33 @@ Open `http://localhost:8080` in your browser. The frontend's Nginx reverse proxy
 
 ## Local Native Setup (Development)
 
-If you prefer to run the codebase natively for Hot Module Replacement (HMR):
+If you prefer to run the codebase natively for Hot Module Replacement (HMR) without Docker:
 
 ### Prerequisites (Native Only)
 - Node.js (v18+)
 - Redis Server (if you want to test multi-server scaling locally)
 
-### 1. Setup Backend
+### 1. Install Dependencies
+Run the following command in the root directory to install dependencies for both the frontend and backend:
 ```bash
-cd backend
-npm install
-npm start
+make install
+```
+
+### 2. Start Services
+To start both the Node.js backend and the Vite React client concurrently, run:
+```bash
+make start-all
 ```
 *Note: The backend defaults to port 3000. It will attempt to connect to Redis at `redis://localhost:6379`. If Redis is not running, it gracefully falls back to single-instance mode.*
 
-### 2. Setup Client
-```bash
-cd client
-npm install
-npm run dev
-```
 Open the provided local URL (usually `http://localhost:5173`) in multiple browser windows to see real-time cursor broadcasting.
 
 ## 3. Load Testing
-To simulate 100 concurrent users moving their cursors simultaneously, simply click the **"Start Load Test"** button in the web interface. This triggers headless WebSocket clients in the backend to begin broadcasting.
+To simulate 100 concurrent users moving their cursors simultaneously, you can run the headless WebSocket clients via the Makefile:
+```bash
+make load-test
+```
+Alternatively, you can also trigger this by clicking the **"Start Load Test"** button in the web interface.
 
 ---
 
