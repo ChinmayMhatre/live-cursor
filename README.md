@@ -49,20 +49,31 @@ To simulate 100 concurrent users moving their cursors simultaneously, simply cli
 
 ## Architecture & Multi-Server Deployment
 
-This backend is built with Node.js and Socket.IO. To satisfy the requirement of horizontal scaling and allowing replicas to be killed/restarted dynamically, we use **Redis Pub/Sub** via the `@socket.io/redis-adapter`.
+This project is designed for **horizontal scalability**, allowing you to run multiple instances of the Node.js backend simultaneously. This ensures high availability and allows the system to handle thousands of concurrent users. 
+
+To achieve this, we use **Redis Pub/Sub** via the `@socket.io/redis-adapter`. 
+
+### Why is Redis necessary for Socket.IO?
+By default, Socket.IO stores connected clients in the server's local memory. If Client A connects to Backend Node 1, and Client B connects to Backend Node 2, they cannot communicate directly. 
+
+When a user moves their cursor, the event must be broadcast to *everyone* in the workspace, regardless of which backend node they are connected to. 
+The **Redis Adapter** solves this. When Node 1 receives a cursor update from Client A, it publishes that event to Redis. Redis then instantly pushes the event to all other backend nodes (Node 2, Node 3, etc.), which then broadcast it to their respective connected clients.
 
 ### Infrastructure Requirements for Production
-1. **Redis Cluster/Instance**: All Node.js backend replicas must connect to the same Redis instance.
-2. **Load Balancer**: A load balancer (like Nginx, HAProxy, or AWS ALB) is required to distribute incoming WebSocket connections across the replicas.
+1. **Redis Server**: A centralized Redis instance (e.g., AWS ElastiCache) that all backend replicas connect to.
+2. **Load Balancer**: A reverse proxy (e.g., Nginx, HAProxy, AWS ALB) to distribute incoming traffic across the backend replicas.
 
 ### Load Balancer Configuration (Sticky Sessions)
-While WebSocket connections are persistent, the initial handshake uses HTTP polling before upgrading. Therefore, **Sticky Sessions (Session Affinity)** are highly recommended so the initial polling requests hit the same server instance before upgrading to WebSocket.
+Socket.IO relies heavily on HTTP Long-Polling for the initial connection handshake before upgrading to a persistent WebSocket connection. 
+
+Because of this multi-request handshake, your load balancer **must** be configured with **Sticky Sessions (Session Affinity)**. This ensures that all HTTP requests from a specific user during the handshake phase are routed to the exact same backend replica. Once the connection upgrades to WebSockets, it remains persistent.
 
 **Example Nginx Configuration:**
 ```nginx
 http {
     upstream io_nodes {
-        ip_hash; # Enables sticky sessions based on client IP
+        # 'ip_hash' ensures requests from the same IP always hit the same server
+        ip_hash; 
         server 127.0.0.1:3000;
         server 127.0.0.1:3001;
         server 127.0.0.1:3002;
@@ -82,7 +93,8 @@ http {
 }
 ```
 
-With this setup, if a Node replica goes down, Socket.IO clients will automatically attempt to reconnect. The Load Balancer will route them to a healthy instance, and they will seamlessly receive a new `workspace:sync` event to restore the shared state without losing functionality.
+### Fault Tolerance & Reconnection
+With this architecture, if a Node replica crashes or is terminated, its connected clients will disconnect. However, Socket.IO's client library will automatically attempt to reconnect. The Load Balancer will seamlessly route these reconnecting clients to a different, healthy replica. Upon reconnection, they will receive a new `workspace:sync` event to restore the shared state without losing functionality or causing visual glitches.
 
 ---
 
