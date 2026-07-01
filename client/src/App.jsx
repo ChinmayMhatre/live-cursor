@@ -22,6 +22,10 @@ function App() {
       setIsLoadTesting(active);
     });
 
+    socket.on('session:init', ({ id }) => {
+      setMyId(id);
+    });
+
     socket.on('workspace:sync', (allParticipants) => {
       const state = {};
       allParticipants.forEach(p => {
@@ -29,11 +33,7 @@ function App() {
       });
       setParticipants(state);
 
-      // The socket doesn't explicitly send back our generated ID yet,
-      // but we can infer it if we know which one is us, or just render all.
-      // Actually, all participants will be rendered. We can just hide ours if we want,
-      // but for this demo, it's fine if we don't see our own network cursor 
-      // (we won't anyway since we don't emit our own to ourselves).
+      // We now explicitly know our generated ID via session:init
     });
 
     socket.on('participant:joined', (participant) => {
@@ -48,10 +48,12 @@ function App() {
       });
     });
 
-    socket.on('cursor:moved', ({ id, x, y }) => {
-      // Decoupled state: do not trigger a React re-render.
-      // Instead, dispatch a custom event that the specific Cursor component listens to.
-      window.dispatchEvent(new CustomEvent(`cursor-move-${id}`, { detail: { x, y } }));
+    socket.on('cursors:update', (batch) => {
+      // Loop through the batched dictionary and dispatch custom events
+      for (const id in batch) {
+        const { x, y } = batch[id];
+        window.dispatchEvent(new CustomEvent(`cursor-move-${id}`, { detail: { x, y } }));
+      }
     });
 
     return () => {
@@ -114,9 +116,11 @@ function App() {
         </button>
       </div>
 
-      {Object.values(participants).map(p => (
-        <Cursor key={p.id} participant={p} />
-      ))}
+      {Object.values(participants)
+        .filter(p => p.id !== myId)
+        .map(p => (
+          <Cursor key={p.id} participant={p} />
+        ))}
     </div>
   );
 }

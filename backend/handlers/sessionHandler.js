@@ -31,6 +31,7 @@ module.exports = async (io, socket) => {
   const allParticipants = sockets.map(s => s.data);
   
   // Send initial sync state to the new user
+  socket.emit('session:init', { id: participantId });
   socket.emit('workspace:sync', allParticipants);
 
   // 3. Broadcast to everyone else that this participant joined

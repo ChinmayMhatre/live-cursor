@@ -103,15 +103,6 @@ With this architecture, if a Node replica crashes or is terminated, its connecte
 
 ## Future Optimizations
 
-### Server-side Event Batching (Tick Rate)
-Currently, the server broadcasts every `cursor:moved` event the instant it receives it. With 100 users moving their mouse 20 times a second, this results in **2,000 WebSocket packets per second** being pushed to the client, which can cause network/CPU choppiness as the browser struggles to parse the headers.
-
-To resolve this at extreme scale, implement a **30Hz Tick Rate**:
-1. Instead of calling `socket.broadcast.emit` instantly, the server stores the latest `{x, y}` coordinates in a temporary dictionary.
-2. A server-side `setInterval` runs every 33ms (30 times a second).
-3. Every 33ms, the server broadcasts the entire dictionary of pending moves as one single payload, and clears the dictionary.
-
-This reduces the network overhead from thousands of tiny packets a second to just 30 slightly larger packets a second, maintaining visual fluidity while drastically lowering the computational cost on the client's networking thread.
 
 ### Client-Side Session Persistence (Reconnections)
 Socket.IO handles reconnections automatically. However, currently when a server restarts, the client reconnects and is treated as a brand new user (assigned a new UUID, name, and color). 
