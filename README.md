@@ -103,6 +103,15 @@ With this architecture, if a Node replica crashes or is terminated, its connecte
 
 ## Future Optimizations
 
+### Decoupling State via Redis (Replacing `fetchSockets`)
+Currently, when a new user joins, `fetchSockets()` is called. This triggers a Pub/Sub broadcast across the Redis adapter asking **every single Node replica** to report back with their connected clients. At scale, this "scatter-gather" query is slow and causes massive network congestion.
+
+To resolve this, the **Connection Layer** should be decoupled from the **State Layer**:
+1. When a user joins or moves, the Node server instantly writes their state to a Redis Hash: `HSET workspace:participants user_id "{x: 10, y: 20}"`.
+2. When a new user joins, instead of asking all other servers who is online, the server simply makes one fast query to Redis: `HGETALL workspace:participants`.
+3. When a user disconnects, the server removes them from the Redis Hash: `HDEL workspace:participants user_id`.
+
+This makes the WebSocket servers completely stateless—acting as dumb pipes passing messages to and from Redis—allowing infinite scaling without losing track of active users.
 
 ### Client-Side Session Persistence (Reconnections)
 Socket.IO handles reconnections automatically. However, currently when a server restarts, the client reconnects and is treated as a brand new user (assigned a new UUID, name, and color). 
